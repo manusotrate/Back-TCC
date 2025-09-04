@@ -15,5 +15,13 @@
   "bugs": {
     "url": "https://github.com/manusotrate/Back-TCC/issues"
   },
-  "homepage": "https://github.com/manusotrate/Back-TCC#readme"
+  "homepage": "https://github.com/manusotrate/Back-TCC#readme",
+  "keywords": [],
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "mysql2": "^3.14.4"
+  }
 }
