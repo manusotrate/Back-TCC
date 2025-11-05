@@ -8,14 +8,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Conexão MySQL usando pool de Promises
-const db = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "root",
-  database: "tcc",
-  port: 3307 // ajuste se necessário
-});
+
 
 // Testar conexão
 (async () => {

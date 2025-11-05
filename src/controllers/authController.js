@@ -1,0 +1,54 @@
+const bcrypt = require("bcryptjs");
+const db = require("../config/db");
+
+// ======================
+// Cadastro
+// ======================
+exports.cadastro = async (req, res) => {
+  const { nome, sobrenome, email, cpf, senha } = req.body;
+
+  if (!nome || !sobrenome || !email || !cpf || !senha) {
+    return res.status(400).json({ error: "Todos os campos são obrigatórios" });
+  }
+
+  try {
+    const hashedSenha = await bcrypt.hash(senha, 10);
+    await db.query(
+      "INSERT INTO cadastro (nome, sobrenome, email, cpf, senha) VALUES (?, ?, ?, ?, ?)",
+      [nome, sobrenome, email, cpf.replace(/\D/g, ""), hashedSenha]
+    );
+    res.status(201).json({ message: "Usuário cadastrado com sucesso!" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao cadastrar usuário" });
+  }
+};
+
+// ======================
+// Login
+// ======================
+exports.login = async (req, res) => {
+  const { cpf, senha } = req.body;
+  if (!cpf || !senha)
+    return res.status(400).json({ erro: "CPF e senha são obrigatórios" });
+
+  try {
+    const cpfLimpo = cpf.replace(/\D/g, "");
+    const [results] = await db.query(
+      "SELECT * FROM cadastro WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = ?",
+      [cpfLimpo]
+    );
+
+    if (results.length === 0)
+      return res.status(401).json({ erro: "CPF não encontrado" });
+
+    const usuario = results[0];
+    const senhaCorreta = await bcrypt.compare(senha, usuario.senha);
+    if (!senhaCorreta) return res.status(401).json({ erro: "Senha incorreta" });
+
+    res.json({ mensagem: "Login realizado com sucesso!" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: "Erro no servidor" });
+  }
+};
