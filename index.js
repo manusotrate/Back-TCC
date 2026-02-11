@@ -17,7 +17,7 @@ const db = mysql.createPool({
   user: "root",
   password: "root",
   database: "tcc",
-  port: 3307
+  port: 3306
 });
 
 // Testar conexão
