@@ -17,7 +17,7 @@ const db = mysql.createPool({
   user: "root",
   password: "root",
   database: "tcc",
-  port: 3307
+  port: 3306
 });
 
 // Testar conexão
@@ -65,7 +65,7 @@ app.post("/cadastro", async (req, res) => {
 
     // Inserir no banco
     await db.query(
-      "INSERT INTO cadastro (nome, sobrenome, email, cpf, senha) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO usuario (nome, sobrenome, email, cpf, senha) VALUES (?, ?, ?, ?, ?)",
       [nome, sobrenome, email, cpf.replace(/\D/g, ''), hashedSenha]
     );
 
@@ -96,7 +96,7 @@ app.post("/login", async (req, res) => {
 
     // Consulta ajustada para ignorar pontos/traços no banco
     const [results] = await db.query(
-      "SELECT * FROM cadastro WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = ?",
+      "SELECT * FROM usuario WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = ?",
       [cpfLimpo]
     );
 
@@ -146,7 +146,7 @@ app.post("/login", async (req, res) => {
 app.get("/usuario", verificarToken, async (req, res) => {
   try {
     const [results] = await db.query(
-      "SELECT id, nome, sobrenome, email, cpf FROM cadastro WHERE id = ?",
+      "SELECT id, nome, sobrenome, email, cpf FROM usuario WHERE id = ?",
       [req.usuario.id]
     );
 
