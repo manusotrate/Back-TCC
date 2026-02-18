@@ -65,7 +65,7 @@ app.post("/cadastro", async (req, res) => {
 
     // Inserir no banco
     await db.query(
-      "INSERT INTO usuario (nome, sobrenome, email, cpf, senha) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO usuarios (nome, sobrenome, email, cpf, senha) VALUES (?, ?, ?, ?, ?)",
       [nome, sobrenome, email, cpf.replace(/\D/g, ''), hashedSenha]
     );
 
@@ -96,7 +96,7 @@ app.post("/login", async (req, res) => {
 
     // Consulta ajustada para ignorar pontos/traços no banco
     const [results] = await db.query(
-      "SELECT * FROM usuario WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = ?",
+      "SELECT * FROM usuarios WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = ?",
       [cpfLimpo]
     );
 
@@ -114,11 +114,11 @@ app.post("/login", async (req, res) => {
     // Gerar token JWT
     const token = jwt.sign(
       { 
-        id: usuario.id,
-        nome: usuario.nome,
-        sobrenome: usuario.sobrenome,
-        email: usuario.email,
-        cpf: usuario.cpf
+        id: usuarios.id,
+        nome: usuarios.nome,
+        sobrenome: usuarios.sobrenome,
+        email: usuarios.email,
+        cpf: usuarios.cpf
       },
       JWT_SECRET,
       { expiresIn: "24h" } // Token expira em 24 horas
@@ -143,10 +143,10 @@ app.post("/login", async (req, res) => {
 // ======================
 // Rota protegida - Obter dados do usuário
 // ======================
-app.get("/usuario", verificarToken, async (req, res) => {
+app.get("/usuarios", verificarToken, async (req, res) => {
   try {
     const [results] = await db.query(
-      "SELECT id, nome, sobrenome, email, cpf FROM usuario WHERE id = ?",
+      "SELECT id, nome, sobrenome, email, cpf FROM usuarios WHERE id = ?",
       [req.usuario.id]
     );
 
