@@ -42,7 +42,7 @@ const verificarToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.usuario = decoded; // Adiciona dados do usuário na requisição
+    req.usuarios = decoded; // Adiciona dados do usuário na requisição
     next();
   } catch (error) {
     return res.status(401).json({ erro: "Token inválido ou expirado" });
@@ -65,7 +65,7 @@ app.post("/cadastro", async (req, res) => {
 
     // Inserir no banco
     await db.query(
-      "INSERT INTO usuario (nome, sobrenome, email, cpf, senha) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO usuarios (nome, sobrenome, email, cpf, senha) VALUES (?, ?, ?, ?, ?)",
       [nome, sobrenome, email, cpf.replace(/\D/g, ''), hashedSenha]
     );
 
@@ -96,7 +96,7 @@ app.post("/login", async (req, res) => {
 
     // Consulta ajustada para ignorar pontos/traços no banco
     const [results] = await db.query(
-      "SELECT * FROM usuario WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = ?",
+      "SELECT * FROM usuarios WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = ?",
       [cpfLimpo]
     );
 
@@ -104,8 +104,8 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ erro: "CPF não encontrado" });
     }
 
-    const usuario = results[0];
-    const senhaCorreta = await bcrypt.compare(senha, usuario.senha);
+    const usuarios = results[0];
+    const senhaCorreta = await bcrypt.compare(senha, usuarios.senha);
     
     if (!senhaCorreta) {
       return res.status(401).json({ erro: "Senha incorreta" });
@@ -114,11 +114,11 @@ app.post("/login", async (req, res) => {
     // Gerar token JWT
     const token = jwt.sign(
       { 
-        id: usuario.id,
-        nome: usuario.nome,
-        sobrenome: usuario.sobrenome,
-        email: usuario.email,
-        cpf: usuario.cpf
+        id: usuarios.id,
+        nome: usuarios.nome,
+        sobrenome: usuarios.sobrenome,
+        email: usuarios.email,
+        cpf: usuarios.cpf
       },
       JWT_SECRET,
       { expiresIn: "24h" } // Token expira em 24 horas
@@ -127,11 +127,11 @@ app.post("/login", async (req, res) => {
     res.json({ 
       mensagem: "Login realizado com sucesso!",
       token,
-      usuario: {
-        id: usuario.id,
-        nome: usuario.nome,
-        sobrenome: usuario.sobrenome,
-        email: usuario.email
+      usuarios: {
+        id: usuarios.id,
+        nome: usuarios.nome,
+        sobrenome: usuarios.sobrenome,
+        email: usuarios.email
       }
     });
   } catch (err) {
@@ -143,18 +143,18 @@ app.post("/login", async (req, res) => {
 // ======================
 // Rota protegida - Obter dados do usuário
 // ======================
-app.get("/usuario", verificarToken, async (req, res) => {
+app.get("/usuarios", verificarToken, async (req, res) => {
   try {
     const [results] = await db.query(
-      "SELECT id, nome, sobrenome, email, cpf FROM usuario WHERE id = ?",
-      [req.usuario.id]
+      "SELECT id, nome, sobrenome, email, cpf FROM usuarioss WHERE id = ?",
+      [req.usuarioss.id]
     );
 
     if (results.length === 0) {
       return res.status(404).json({ erro: "Usuário não encontrado" });
     }
 
-    res.json({ usuario: results[0] });
+    res.json({ usuarioss: results[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro no servidor" });
@@ -167,7 +167,7 @@ app.get("/usuario", verificarToken, async (req, res) => {
 app.get("/validar-token", verificarToken, (req, res) => {
   res.json({ 
     valido: true, 
-    usuario: req.usuario 
+    usuarios: req.usuarios 
   });
 });
 
