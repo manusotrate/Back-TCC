@@ -146,7 +146,7 @@ app.post("/login", async (req, res) => {
 app.get("/usuarios", verificarToken, async (req, res) => {
   try {
     const [results] = await db.query(
-      "SELECT id, nome, sobrenome, email, cpf FROM usuario WHERE id = ?",
+      "SELECT id, nome, sobrenome, email, cpf FROM usuarios WHERE id = ?",
       [req.usuarios.id]
     );
 
