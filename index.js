@@ -147,14 +147,14 @@ app.get("/usuarios", verificarToken, async (req, res) => {
   try {
     const [results] = await db.query(
       "SELECT id, nome, sobrenome, email, cpf FROM usuario WHERE id = ?",
-      [req.usuario.id]
+      [req.usuarios.id]
     );
 
     if (results.length === 0) {
       return res.status(404).json({ erro: "Usuário não encontrado" });
     }
 
-    res.json({ usuarioss: results[0] });
+    res.json({ usuarios: results[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Erro no servidor" });
