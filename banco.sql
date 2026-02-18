@@ -1,59 +1,35 @@
 DROP DATABASE IF EXISTS tcc;
--- MySQL Workbench Forward Engineering
 
 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
-SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+SET @OLD_SQL_MODE=@@SQL_MODE, 
+SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 
-<<<<<<< HEAD
-CREATE SCHEMA IF NOT EXISTS `tcc` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci ;
-USE `tcc` ;
+CREATE SCHEMA IF NOT EXISTS tcc 
+DEFAULT CHARACTER SET utf8mb4 
+COLLATE utf8mb4_0900_ai_ci;
 
--- -----------------------------------------------------
--- Table `tcc`.`viagens`
--- -----------------------------------------------------
-DROP TABLE IF EXISTS `tcc`.`viagens` ;
-
-CREATE TABLE IF NOT EXISTS `tcc`.`viagens` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `origem` VARCHAR(45) NOT NULL,
-  `destino` VARCHAR(45) NOT NULL,
-  PRIMARY KEY (`id`))
-=======
-CREATE SCHEMA IF NOT EXISTS tcc DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci ;
-USE tcc ;
+USE tcc;
 
 -- -----------------------------------------------------
--- Table tcc.viagens
+-- Table viagens
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS tcc.viagens ;
+DROP TABLE IF EXISTS viagens;
 
-CREATE TABLE IF NOT EXISTS tcc.viagens (
+CREATE TABLE viagens (
   id INT NOT NULL AUTO_INCREMENT,
   origem VARCHAR(45) NOT NULL,
   destino VARCHAR(45) NOT NULL,
-  PRIMARY KEY (id))
->>>>>>> d32060af64b571b817d1f3aa78280496325d029e
-ENGINE = InnoDB;
+  PRIMARY KEY (id)
+) ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table tcc.usuarios
+-- Table usuarios
 -- -----------------------------------------------------
-<<<<<<< HEAD
-CREATE TABLE IF NOT EXISTS `tcc`.`usuarios` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `nome` VARCHAR(100) NOT NULL,
-  `sobrenome` VARCHAR(100) NOT NULL,
-  `email` VARCHAR(150) NOT NULL,
-  `cpf` VARCHAR(14) NOT NULL,
-  `senha` VARCHAR(255) NOT NULL,
-  `saldo` DECIMAL(10,3) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`),
-  UNIQUE INDEX `email` (`email` ASC) VISIBLE,
-  UNIQUE INDEX `cpf` (`cpf` ASC) VISIBLE)
-=======
-CREATE TABLE IF NOT EXISTS tcc.usuarios (
+DROP TABLE IF EXISTS usuarios;
+
+CREATE TABLE usuarios (
   id INT NOT NULL AUTO_INCREMENT,
   nome VARCHAR(100) NOT NULL,
   sobrenome VARCHAR(100) NOT NULL,
@@ -62,104 +38,69 @@ CREATE TABLE IF NOT EXISTS tcc.usuarios (
   senha VARCHAR(255) NOT NULL,
   saldo DECIMAL(10,3) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
-  UNIQUE INDEX email (email ASC) VISIBLE,
-  UNIQUE INDEX cpf (cpf ASC) VISIBLE)
->>>>>>> d32060af64b571b817d1f3aa78280496325d029e
-ENGINE = InnoDB
-AUTO_INCREMENT = 2
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+  UNIQUE (email),
+  UNIQUE (cpf)
+) ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table tcc.tickets
+-- Table tickets
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS tcc.tickets ;
+DROP TABLE IF EXISTS tickets;
 
-<<<<<<< HEAD
-CREATE TABLE IF NOT EXISTS `tcc`.`tickets` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `duração` TIME NOT NULL,
-  `quantidade` INT NOT NULL,
-  `valor` DECIMAL(10,3) NOT NULL,
-  `ativação` TIMESTAMP NOT NULL,
-  `status` ENUM('ativo', 'usado') NOT NULL,
-  `viagens_id` INT NOT NULL,
-  `usuarios_id` INT NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE INDEX `cpf` (`duração` ASC) VISIBLE,
-  INDEX `fk_tickets_viagens1_idx` (`viagens_id` ASC) VISIBLE,
-  INDEX `fk_tickets_usuarios1_idx` (`usuarios_id` ASC) VISIBLE,
-  CONSTRAINT `fk_tickets_viagens1`
-    FOREIGN KEY (`viagens_id`)
-    REFERENCES `tcc`.`viagens` (`id`)
-=======
-CREATE TABLE IF NOT EXISTS tcc.tickets (
+CREATE TABLE tickets (
   id INT NOT NULL AUTO_INCREMENT,
+  codigo VARCHAR(100) NOT NULL UNIQUE,
   duração TIME NOT NULL,
-  quantidade INT NOT NULL,
   valor DECIMAL(10,3) NOT NULL,
   ativação TIMESTAMP NOT NULL,
-  status ENUM('ativo', 'usado') NOT NULL,
+  status ENUM('ativo', 'usado', 'cancelado', 'expirado') 
+         NOT NULL DEFAULT 'ativo',
   viagens_id INT NOT NULL,
   usuarios_id INT NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE INDEX cpf (duração ASC) VISIBLE,
-  INDEX fk_tickets_viagens1_idx (viagens_id ASC) VISIBLE,
-  INDEX fk_tickets_usuarios1_idx (usuarios_id ASC) VISIBLE,
+
+  INDEX fk_tickets_viagens1_idx (viagens_id),
+  INDEX fk_tickets_usuarios1_idx (usuarios_id),
+
   CONSTRAINT fk_tickets_viagens1
     FOREIGN KEY (viagens_id)
-    REFERENCES tcc.viagens (id)
->>>>>>> d32060af64b571b817d1f3aa78280496325d029e
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES viagens (id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
   CONSTRAINT fk_tickets_usuarios1
     FOREIGN KEY (usuarios_id)
-    REFERENCES tcc.usuarios (id)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
-ENGINE = InnoDB
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
+    REFERENCES usuarios (id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+
+) ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
-<<<<<<< HEAD
--- Table `tcc`.`pagamentos`
+-- Table pagamentos
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `tcc`.`pagamentos` ;
+DROP TABLE IF EXISTS pagamentos;
 
-CREATE TABLE IF NOT EXISTS `tcc`.`pagamentos` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `valor` DECIMAL(10,3) NOT NULL,
-  `formas_pagamento` ENUM('Crédito', 'Debito', 'Pix') NOT NULL,
-  `data` TIMESTAMP NOT NULL,
-  `tickets_id` INT NOT NULL,
-  PRIMARY KEY (`id`),
-  INDEX `fk_pagamentos_tickets_idx` (`tickets_id` ASC) VISIBLE,
-  CONSTRAINT `fk_pagamentos_tickets`
-    FOREIGN KEY (`tickets_id`)
-    REFERENCES `tcc`.`tickets` (`id`)
-=======
--- Table tcc.pagamentos
--- -----------------------------------------------------
-DROP TABLE IF EXISTS tcc.pagamentos ;
-
-CREATE TABLE IF NOT EXISTS tcc.pagamentos (
+CREATE TABLE pagamentos (
   id INT NOT NULL AUTO_INCREMENT,
   valor DECIMAL(10,3) NOT NULL,
   formas_pagamento ENUM('Crédito', 'Debito', 'Pix') NOT NULL,
   data TIMESTAMP NOT NULL,
   tickets_id INT NOT NULL,
   PRIMARY KEY (id),
-  INDEX fk_pagamentos_tickets_idx (tickets_id ASC) VISIBLE,
+
+  INDEX fk_pagamentos_tickets_idx (tickets_id),
+
   CONSTRAINT fk_pagamentos_tickets
     FOREIGN KEY (tickets_id)
-    REFERENCES tcc.tickets (id)
->>>>>>> d32060af64b571b817d1f3aa78280496325d029e
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
-ENGINE = InnoDB;
+    REFERENCES tickets (id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+
+) ENGINE = InnoDB;
+
 
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
