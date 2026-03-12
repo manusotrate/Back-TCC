@@ -109,6 +109,30 @@ ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
+-- -----------------------------------------------------
+-- Table `tcc`.`pagamentos_recarga`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `tcc`.`pagamentos_recarga` ;
+
+CREATE TABLE IF NOT EXISTS `tcc`.`pagamentos_recarga` (
+  `id`            INT           NOT NULL AUTO_INCREMENT,
+  `usuario_id`    INT           NOT NULL,
+  `payment_id_mp` VARCHAR(100)  NOT NULL,
+  `valor`         DECIMAL(10,2) NOT NULL,
+  `status`        ENUM('aprovado', 'pendente', 'recusado') NOT NULL DEFAULT 'pendente',
+  `criado_em`     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `payment_id_mp` (`payment_id_mp` ASC) VISIBLE,
+  INDEX `fk_pagamentos_recarga_usuario_idx` (`usuario_id` ASC) VISIBLE,
+  CONSTRAINT `fk_pagamentos_recarga_usuario`
+    FOREIGN KEY (`usuario_id`)
+    REFERENCES `tcc`.`usuarios` (`id`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
 
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
