@@ -82,6 +82,7 @@ exports.login = async (req, res) => {
     });
 
   } catch (err) {
+    console.error('ERRO LOGIN:', err); // ← adicione isso
     res.status(500).json({ erro: "Erro no servidor" });
   }
 };
