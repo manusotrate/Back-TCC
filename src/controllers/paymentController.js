@@ -24,11 +24,20 @@ exports.criarPagamentoPix = async (req, res) => {
         description: "Recarga BusTap",
         payment_method_id: "pix",
         payer: {
-          email,
+          email: email,
           first_name: nome,
           identification: {
             type: "CPF",
             number: String(cpf).replace(/\D/g, ""),
+          },
+        },
+        additional_info: {
+          payer: {
+            first_name: nome,
+            identification: {
+              type: "CPF",
+              number: String(cpf).replace(/\D/g, ""),
+            },
           },
         },
         metadata: {
