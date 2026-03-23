@@ -133,11 +133,127 @@ exports.getSaldo = async (req, res) => {
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ erro: "Usuário não encontrado" });
+      return res.status().json({ erro: "Usuário não encontrado" });
     }
 
     res.json({ saldo: parseFloat(rows[0].saldo) });
   } catch (error) {
     res.status(500).json({ erro: "Erro ao buscar saldo" });
+  }
+};
+
+// ================= PAGAMENTO COM DÉBITO =================
+exports.pagarComDebito = async (req, res) => {
+  const { valor, token, paymentMethodId, issuerId, installments } = req.body;
+  const usuarioId = req.usuario.id;
+
+  try {
+    console.log("📋 Dados recebidos para débito:", {
+      valor,
+      token: token ? `${token.substring(0, 20)}...` : "não informado",
+      tokenLength: token ? token.length : 0,
+      paymentMethodId,
+      issuerId,
+      installments
+    });
+
+    // Validação básica
+    if (!valor || valor <= 0) {
+      return res.status(400).json({ erro: "Valor inválido" });
+    }
+
+    if (!token) {
+      return res.status(400).json({ erro: "Token do cartão não fornecido" });
+    }
+
+    // Processa pagamento via Mercado Pago com token
+    const payment = new Payment(client);
+    
+    const paymentPayload = {
+      body: {
+        transaction_amount: parseFloat(valor),
+        token: token, // Token gerado pelo SDK do MP no frontend
+        installments: installments || 1,
+        payment_method_id: paymentMethodId || "visa", // Valor padrão é "visa" (bandeira, não o tipo de transação)
+        payer: {
+          email: req.usuario.email,
+        },
+        description: "Recarga BusTap - Débito",
+        metadata: {
+          usuario_id: usuarioId,
+          tipo: "recarga",
+          valor: parseFloat(valor),
+        },
+      },
+    };
+
+    // Adiciona issuer_id se fornecido
+    if (issuerId) {
+      paymentPayload.body.issuer_id = issuerId;
+    }
+
+    console.log("📤 Enviando payload ao MP:", JSON.stringify(paymentPayload.body, null, 2));
+
+    const paymentResponse = await payment.create(paymentPayload);
+
+    console.log("📥 Resposta do MP completa:", JSON.stringify(paymentResponse, null, 2));
+
+    // Se aprovado, atualiza saldo
+    if (paymentResponse.status === "approved") {
+      const conn = await db.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        await conn.query(
+          "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?",
+          [valor, usuarioId]
+        );
+
+        await conn.query(
+          `INSERT INTO pagamentos_recarga 
+            (usuario_id, payment_id_mp, valor, status, criado_em)
+           VALUES (?, ?, ?, 'aprovado', NOW())`,
+          [usuarioId, String(paymentResponse.id), valor]
+        );
+
+        await conn.commit();
+        console.log(`✅ Pagamento com débito aprovado: usuário ${usuarioId} +R$${valor}`);
+
+        // Busca o novo saldo
+        const [saldoResult] = await db.query(
+          "SELECT saldo FROM usuarios WHERE id = ?",
+          [usuarioId]
+        );
+
+        res.json({
+          sucesso: true,
+          status: "approved",
+          mensagem: "Pagamento aprovado",
+          novoSaldo: parseFloat(saldoResult[0].saldo),
+          paymentId: paymentResponse.id,
+        });
+      } catch (err) {
+        await conn.rollback();
+        console.error("Erro na transação de débito:", err);
+        res.status(500).json({ erro: "Erro ao processar pagamento" });
+      } finally {
+        conn.release();
+      }
+    } else {
+      // Pagamento recusado ou pendente
+      console.warn(`⚠️ Pagamento ${paymentResponse.status}:`, paymentResponse.status_detail);
+      res.status(400).json({
+        sucesso: false,
+        status: paymentResponse.status,
+        statusDetail: paymentResponse.status_detail || "Pagamento não aprovado",
+        mensagem: paymentResponse.status_detail || "Pagamento não aprovado",
+      });
+    }
+  } catch (error) {
+    console.error("Erro ao processar pagamento com débito:", error);
+    res.status(500).json({ 
+      erro: "Erro ao processar pagamento",
+      detalhes: error.message 
+    });
   }
 };

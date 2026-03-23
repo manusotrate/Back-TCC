@@ -7,6 +7,9 @@ const verificarToken = require("../middlewares/authMiddleware");
 // Cria preferência de pagamento (requer login)
 router.post("/pagamentos/preferencia", verificarToken, paymentController.criarPreferencia);
 
+// Pagamento com débito (requer login)
+router.post("/pagamentos/debito", verificarToken, paymentController.pagarComDebito);
+
 // Webhook do Mercado Pago (sem autenticação — chamado pelo MP)
 router.post("/pagamentos/webhook", paymentController.webhook);
 
