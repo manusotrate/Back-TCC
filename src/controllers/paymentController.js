@@ -90,7 +90,7 @@ exports.criarPagamentoDebito = async (req, res) => {
         description: "Recarga BusTap",
         installments: 1,
         payment_method_id: paymentMethodId,
-        issuer_id: issuerId,
+        issuer_id: issuerId ? parseInt(issuerId) : undefined,        
         payer: {
           email,
           first_name: nome,
@@ -241,15 +241,7 @@ exports.getSaldo = async (req, res) => {
       "SELECT saldo FROM usuarios WHERE id = ?",
       [req.usuario.id]
     );
-<<<<<<< HEAD
-
-    if (rows.length === 0) {
-      return res.status().json({ erro: "Usuário não encontrado" });
-    }
-
-=======
     if (rows.length === 0) return res.status(404).json({ erro: "Usuário não encontrado" });
->>>>>>> cf64ba535304f348ca950249a76c8c912e7e7d56
     res.json({ saldo: parseFloat(rows[0].saldo) });
   } catch (error) {
     res.status(500).json({ erro: "Erro ao buscar saldo" });
@@ -288,7 +280,7 @@ exports.pagarComDebito = async (req, res) => {
         transaction_amount: parseFloat(valor),
         token: token, // Token gerado pelo SDK do MP no frontend
         installments: installments || 1,
-        payment_method_id: paymentMethodId || "visa", // Valor padrão é "visa" (bandeira, não o tipo de transação)
+        payment_method_id: paymentMethodId || "visa",
         payer: {
           email: req.usuario.email,
         },
@@ -301,9 +293,14 @@ exports.pagarComDebito = async (req, res) => {
       },
     };
 
-    // Adiciona issuer_id se fornecido
+    // Só adiciona issuer_id se for um número inteiro válido
     if (issuerId) {
-      paymentPayload.body.issuer_id = issuerId;
+      const parsedIssuer = Number(issuerId);
+      if (!isNaN(parsedIssuer) && Number.isInteger(parsedIssuer) && parsedIssuer > 0) {
+        paymentPayload.body.issuer_id = parsedIssuer;
+      } else {
+        console.warn(`issuerId inválido ignorado: ${issuerId} (não é número inteiro positivo)`);
+      }
     }
 
     console.log("📤 Enviando payload ao MP:", JSON.stringify(paymentPayload.body, null, 2));

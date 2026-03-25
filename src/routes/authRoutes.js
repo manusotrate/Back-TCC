@@ -6,7 +6,7 @@ const verificarToken = require("../middlewares/authMiddleware");
 
 router.post("/cadastro", authController.cadastro);
 router.post("/login", authController.login);
-router.get("/usuarios", verificarToken, authController.getUsuario);
+router.get("/usuario", verificarToken, authController.getUsuario);
 router.get("/validar-token", verificarToken, authController.validarToken);
 
 module.exports = router;
