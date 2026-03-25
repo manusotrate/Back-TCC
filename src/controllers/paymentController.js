@@ -83,31 +83,35 @@ exports.criarPagamentoDebito = async (req, res) => {
   try {
     const payment = new Payment(client);
 
-    const resultado = await payment.create({
-      body: {
-        transaction_amount: parseFloat(valor),
-        token,
-        description: "Recarga BusTap",
-        installments: 1,
-        payment_method_id: paymentMethodId,
-        issuer_id: issuerId ? parseInt(issuerId) : undefined,        
-        payer: {
-          email,
-          first_name: nome,
-          identification: {
-            type: "CPF",
-            number: String(cpf).replace(/\D/g, ""),
-          },
-        },
-        metadata: {
-          usuario_id: usuarioId,
-          tipo: "recarga",
-          valor: parseFloat(valor),
+    const body = {
+      transaction_amount: parseFloat(valor),
+      token,
+      description: "Recarga BusTap",
+      installments: 1,
+      payment_method_id: paymentMethodId,
+      payer: {
+        email,
+        first_name: nome,
+        identification: {
+          type: "CPF",
+          number: String(cpf).replace(/\D/g, ""),
         },
       },
-    });
+      metadata: {
+        usuario_id: usuarioId,
+        tipo: "recarga",
+        valor: parseFloat(valor),
+      },
+    };
 
-    // Se aprovado, já atualiza saldo
+    // Só inclui issuer_id se for um número válido e positivo
+    const parsedIssuer = parseInt(issuerId);
+    if (!isNaN(parsedIssuer) && parsedIssuer > 0) {
+      body.issuer_id = parsedIssuer;
+    }
+
+    const resultado = await payment.create({ body });
+
     if (resultado.status === "approved") {
       const conn = await db.getConnection();
       try {
@@ -122,7 +126,6 @@ exports.criarPagamentoDebito = async (req, res) => {
           [usuarioId, String(resultado.id), parseFloat(valor)]
         );
         await conn.commit();
-        console.log(`✅ Débito aprovado: usuário ${usuarioId} +R$${valor}`);
       } catch (err) {
         await conn.rollback();
         console.error("Erro transação débito:", err);
