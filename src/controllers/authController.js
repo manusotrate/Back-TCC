@@ -27,6 +27,7 @@ exports.cadastro = async (req, res) => {
       return res.status(400).json({ erro: "CPF ou email já cadastrado" });
     }
 
+    console.error('ERRO CADASTRO:', error);
     res.status(500).json({ erro: "Erro ao cadastrar usuário" });
   }
 };
