@@ -10,7 +10,7 @@ exports.getTickets = async (req, res) => {
       `SELECT 
         id,
         codigo,
-        TIME_TO_SEC(duração) / 60 AS minutos,
+        distancia_km,
         valor,
         ativação,
         status
@@ -29,11 +29,11 @@ exports.getTickets = async (req, res) => {
 
 // ================= COMPRAR TICKET =================
 exports.comprarTicket = async (req, res) => {
-  const { minutos, valor } = req.body;
+  const { distancia_km, valor } = req.body;
   const usuarioId = req.usuario.id;
 
-  if (!minutos || !valor) {
-    return res.status(400).json({ erro: "Minutos e valor são obrigatórios" });
+  if (!distancia_km || !valor) {
+    return res.status(400).json({ erro: "Distância (km) e valor são obrigatórios" });
   }
 
   const conn = await db.getConnection();
@@ -62,7 +62,8 @@ exports.comprarTicket = async (req, res) => {
     const [viagens] = await conn.query("SELECT id FROM viagens LIMIT 1");
     if (viagens.length === 0) {
       const [novaViagem] = await conn.query(
-        "INSERT INTO viagens (origem, destino) VALUES ('Origem', 'Destino')"
+        "INSERT INTO viagens (origem, destino, distancia_km) VALUES ('Origem', 'Destino', ?)",
+        [distancia_km]
       );
       viagemId = novaViagem.insertId;
     } else {
@@ -71,12 +72,11 @@ exports.comprarTicket = async (req, res) => {
 
     // Insere o ticket
     const codigo = uuidv4();
-    const duracaoFormatada = `${String(Math.floor(minutos / 60)).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}:00`;
 
     await conn.query(
-      `INSERT INTO tickets (codigo, duração, valor, ativação, status, viagens_id, usuarios_id)
+      `INSERT INTO tickets (codigo, distancia_km, valor, ativação, status, viagens_id, usuarios_id)
        VALUES (?, ?, ?, NOW(), 'ativo', ?, ?)`,
-      [codigo, duracaoFormatada, valor, viagemId, usuarioId]
+      [codigo, distancia_km, valor, viagemId, usuarioId]
     );
 
     // Desconta saldo
