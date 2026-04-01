@@ -103,7 +103,19 @@ exports.criarPagamentoDebito = async (req, res) => {
       },
     };
 
-    console.log('🚀 Payload completo para MP:', JSON.stringify(body, null, 2));
+    // Log seguro: não imprimir token completo nem CPF
+    try {
+      const safeLog = {
+        transaction_amount: body.transaction_amount,
+        description: body.description,
+        payment_method_id: body.payment_method_id,
+        metadata: body.metadata,
+        payer: { email: body.payer && body.payer.email }
+      };
+      console.log('🚀 Enviando payload (mask):', JSON.stringify(safeLog, null, 2));
+    } catch (e) {
+      console.log('🚀 Enviando payload (mask): [erro ao montar log]');
+    }
     const resultado = await payment.create({ body });
 
     // Compatibilidade com diferentes formatos de retorno da SDK
@@ -352,11 +364,35 @@ exports.pagarComDebito = async (req, res) => {
       }
     }
 
-    console.log("📤 Enviando payload ao MP:", JSON.stringify(paymentPayload.body, null, 2));
+    // Log seguro do payload (não imprimir token nem dados sensíveis)
+    try {
+      const pb = paymentPayload.body;
+      const safePb = {
+        transaction_amount: pb.transaction_amount,
+        installments: pb.installments,
+        payment_method_id: pb.payment_method_id,
+        metadata: pb.metadata,
+        payer: { email: pb.payer && pb.payer.email },
+        issuer_id: pb.issuer_id || null
+      };
+      console.log("📤 Enviando payload ao MP (mask):", JSON.stringify(safePb, null, 2));
+    } catch (e) {
+      console.log('📤 Enviando payload ao MP (mask): [erro ao montar log]');
+    }
 
     const paymentResponse = await payment.create(paymentPayload);
 
-    console.log("📥 Resposta do MP completa:", JSON.stringify(paymentResponse, null, 2));
+    // Log seguro da resposta (não imprimir dados sensíveis)
+    try {
+      const safeResp = {
+        id: paymentResponse.id || (paymentResponse.response && paymentResponse.response.id),
+        status: paymentResponse.status || (paymentResponse.response && paymentResponse.response.status),
+        status_detail: paymentResponse.status_detail || (paymentResponse.response && paymentResponse.response.status_detail)
+      };
+      console.log("📥 Resposta do MP (mask):", JSON.stringify(safeResp, null, 2));
+    } catch (e) {
+      console.log('📥 Resposta do MP (mask): [erro ao montar log]');
+    }
 
     // Se aprovado, atualiza saldo
     if (paymentResponse.status === "approved" || paymentResponse.status === "authorized") {
