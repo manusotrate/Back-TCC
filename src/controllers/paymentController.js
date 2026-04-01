@@ -25,7 +25,6 @@ exports.criarPagamentoPix = async (req, res) => {
         payment_method_id: "pix",
         payer: {
           email: email,
-          first_name: nome,
           identification: {
             type: "CPF",
             number: String(cpf).replace(/\D/g, ""),
@@ -104,27 +103,54 @@ exports.criarPagamentoDebito = async (req, res) => {
       },
     };
 
-    // Só inclui issuer_id se for um número válido e positivo
-    const parsedIssuer = parseInt(issuerId);
-    if (!isNaN(parsedIssuer) && parsedIssuer > 0) {
-      body.issuer_id = parsedIssuer;
-    }
-
+    console.log('🚀 Payload completo para MP:', JSON.stringify(body, null, 2));
     const resultado = await payment.create({ body });
 
-    if (resultado.status === "approved") {
+    // Compatibilidade com diferentes formatos de retorno da SDK
+    const paymentId = String(resultado.id || (resultado.response && resultado.response.id) || (resultado.body && resultado.body.id));
+    const status = resultado.status || (resultado.response && resultado.response.status) || (resultado.body && resultado.body.status);
+    const statusDetail = resultado.status_detail || (resultado.response && resultado.response.status_detail) || (resultado.body && resultado.body.status_detail);
+
+    console.log("Status retornado pelo MP:", status, statusDetail);
+
+    if (status === "approved" || status === "authorized") {
       const conn = await db.getConnection();
       try {
         await conn.beginTransaction();
-        await conn.query(
-          "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?",
-          [parseFloat(valor), usuarioId]
+
+        // Verifica se o pagamento já foi processado para evitar crédito duplo
+        const [exist] = await conn.query(
+          "SELECT status FROM pagamentos_recarga WHERE payment_id_mp = ? FOR UPDATE",
+          [paymentId]
         );
-        await conn.query(
-          `INSERT INTO pagamentos_recarga (usuario_id, payment_id_mp, valor, status)
-           VALUES (?, ?, ?, 'aprovado')`,
-          [usuarioId, String(resultado.id), parseFloat(valor)]
-        );
+
+        if (exist.length === 0) {
+          await conn.query(
+            `INSERT INTO pagamentos_recarga (usuario_id, payment_id_mp, valor, status)
+             VALUES (?, ?, ?, 'aprovado')`,
+            [usuarioId, paymentId, parseFloat(valor)]
+          );
+
+          await conn.query(
+            "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?",
+            [parseFloat(valor), usuarioId]
+          );
+
+          console.log(`✅ Débito processado: inserido pagamento ${paymentId} e creditado R$${valor} para usuário ${usuarioId}`);
+        } else if (exist[0].status !== 'aprovado') {
+          await conn.query(
+            "UPDATE pagamentos_recarga SET status = 'aprovado' WHERE payment_id_mp = ?",
+            [paymentId]
+          );
+          await conn.query(
+            "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?",
+            [parseFloat(valor), usuarioId]
+          );
+          console.log(`✅ Débito processado: pagamento ${paymentId} atualizado para aprovado e creditado R$${valor} para usuário ${usuarioId}`);
+        } else {
+          console.log(`⚠️ Pagamento ${paymentId} já estava marcado como aprovado — nenhum crédito aplicado.`);
+        }
+
         await conn.commit();
       } catch (err) {
         await conn.rollback();
@@ -134,10 +160,30 @@ exports.criarPagamentoDebito = async (req, res) => {
       }
     }
 
+    // Se foi aprovado, retorna também o saldo atualizado
+    if (status === "approved" || status === "authorized") {
+      try {
+        const [saldoResult] = await db.query(
+          "SELECT saldo FROM usuarios WHERE id = ?",
+          [usuarioId]
+        );
+        const novoSaldo = saldoResult && saldoResult[0] ? parseFloat(saldoResult[0].saldo) : null;
+
+        return res.json({
+          paymentId,
+          status,
+          statusDetail,
+          novoSaldo,
+        });
+      } catch (err) {
+        console.error('Erro ao buscar saldo após processamento:', err);
+      }
+    }
+
     res.json({
-      paymentId: resultado.id,
-      status: resultado.status,
-      statusDetail: resultado.status_detail,
+      paymentId,
+      status,
+      statusDetail,
     });
   } catch (error) {
     console.error("Erro ao processar débito:", error);
@@ -313,7 +359,7 @@ exports.pagarComDebito = async (req, res) => {
     console.log("📥 Resposta do MP completa:", JSON.stringify(paymentResponse, null, 2));
 
     // Se aprovado, atualiza saldo
-    if (paymentResponse.status === "approved") {
+    if (paymentResponse.status === "approved" || paymentResponse.status === "authorized") {
       const conn = await db.getConnection();
       try {
         await conn.beginTransaction();
