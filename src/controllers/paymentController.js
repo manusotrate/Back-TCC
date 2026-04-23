@@ -25,6 +25,7 @@ exports.criarPagamentoPix = async (req, res) => {
         payment_method_id: "pix",
         payer: {
           email: email,
+          first_name: nome,
           identification: {
             type: "CPF",
             number: String(cpf).replace(/\D/g, ""),
@@ -82,88 +83,46 @@ exports.criarPagamentoDebito = async (req, res) => {
   try {
     const payment = new Payment(client);
 
-    const body = {
-      transaction_amount: parseFloat(valor),
-      token,
-      description: "Recarga BusTap",
-      installments: 1,
-      payment_method_id: paymentMethodId,
-      payer: {
-        email,
-        first_name: nome,
-        identification: {
-          type: "CPF",
-          number: String(cpf).replace(/\D/g, ""),
+    const resultado = await payment.create({
+      body: {
+        transaction_amount: parseFloat(valor),
+        token,
+        description: "Recarga BusTap",
+        installments: 1,
+        payment_method_id: paymentMethodId,
+        issuer_id: issuerId,
+        payer: {
+          email,
+          first_name: nome,
+          identification: {
+            type: "CPF",
+            number: String(cpf).replace(/\D/g, ""),
+          },
+        },
+        metadata: {
+          usuario_id: usuarioId,
+          tipo: "recarga",
+          valor: parseFloat(valor),
         },
       },
-      metadata: {
-        usuario_id: usuarioId,
-        tipo: "recarga",
-        valor: parseFloat(valor),
-      },
-    };
+    });
 
-    // Log seguro: não imprimir token completo nem CPF
-    try {
-      const safeLog = {
-        transaction_amount: body.transaction_amount,
-        description: body.description,
-        payment_method_id: body.payment_method_id,
-        metadata: body.metadata,
-        payer: { email: body.payer && body.payer.email }
-      };
-      console.log('🚀 Enviando payload (mask):', JSON.stringify(safeLog, null, 2));
-    } catch (e) {
-      console.log('🚀 Enviando payload (mask): [erro ao montar log]');
-    }
-    const resultado = await payment.create({ body });
-
-    // Compatibilidade com diferentes formatos de retorno da SDK
-    const paymentId = String(resultado.id || (resultado.response && resultado.response.id) || (resultado.body && resultado.body.id));
-    const status = resultado.status || (resultado.response && resultado.response.status) || (resultado.body && resultado.body.status);
-    const statusDetail = resultado.status_detail || (resultado.response && resultado.response.status_detail) || (resultado.body && resultado.body.status_detail);
-
-    console.log("Status retornado pelo MP:", status, statusDetail);
-
-    if (status === "approved" || status === "authorized") {
+    // Se aprovado, já atualiza saldo
+    if (resultado.status === "approved") {
       const conn = await db.getConnection();
       try {
         await conn.beginTransaction();
-
-        // Verifica se o pagamento já foi processado para evitar crédito duplo
-        const [exist] = await conn.query(
-          "SELECT status FROM pagamentos_recarga WHERE payment_id_mp = ? FOR UPDATE",
-          [paymentId]
+        await conn.query(
+          "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?",
+          [parseFloat(valor), usuarioId]
         );
-
-        if (exist.length === 0) {
-          await conn.query(
-            `INSERT INTO pagamentos_recarga (usuario_id, payment_id_mp, valor, status)
-             VALUES (?, ?, ?, 'aprovado')`,
-            [usuarioId, paymentId, parseFloat(valor)]
-          );
-
-          await conn.query(
-            "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?",
-            [parseFloat(valor), usuarioId]
-          );
-
-          console.log(`✅ Débito processado: inserido pagamento ${paymentId} e creditado R$${valor} para usuário ${usuarioId}`);
-        } else if (exist[0].status !== 'aprovado') {
-          await conn.query(
-            "UPDATE pagamentos_recarga SET status = 'aprovado' WHERE payment_id_mp = ?",
-            [paymentId]
-          );
-          await conn.query(
-            "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?",
-            [parseFloat(valor), usuarioId]
-          );
-          console.log(`✅ Débito processado: pagamento ${paymentId} atualizado para aprovado e creditado R$${valor} para usuário ${usuarioId}`);
-        } else {
-          console.log(`⚠️ Pagamento ${paymentId} já estava marcado como aprovado — nenhum crédito aplicado.`);
-        }
-
+        await conn.query(
+          `INSERT INTO pagamentos_recarga (usuario_id, payment_id_mp, valor, status)
+           VALUES (?, ?, ?, 'aprovado')`,
+          [usuarioId, String(resultado.id), parseFloat(valor)]
+        );
         await conn.commit();
+        console.log(`✅ Débito aprovado: usuário ${usuarioId} +R$${valor}`);
       } catch (err) {
         await conn.rollback();
         console.error("Erro transação débito:", err);
@@ -172,30 +131,10 @@ exports.criarPagamentoDebito = async (req, res) => {
       }
     }
 
-    // Se foi aprovado, retorna também o saldo atualizado
-    if (status === "approved" || status === "authorized") {
-      try {
-        const [saldoResult] = await db.query(
-          "SELECT saldo FROM usuarios WHERE id = ?",
-          [usuarioId]
-        );
-        const novoSaldo = saldoResult && saldoResult[0] ? parseFloat(saldoResult[0].saldo) : null;
-
-        return res.json({
-          paymentId,
-          status,
-          statusDetail,
-          novoSaldo,
-        });
-      } catch (err) {
-        console.error('Erro ao buscar saldo após processamento:', err);
-      }
-    }
-
     res.json({
-      paymentId,
-      status,
-      statusDetail,
+      paymentId: resultado.id,
+      status: resultado.status,
+      statusDetail: resultado.status_detail,
     });
   } catch (error) {
     console.error("Erro ao processar débito:", error);
@@ -249,91 +188,13 @@ exports.consultarPagamento = async (req, res) => {
 };
 
 // ================= WEBHOOK =================
-const crypto = require('crypto');
-
-// Helper: safely compare buffers
-function secureCompare(a, b) {
-  try {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    if (bufA.length !== bufB.length) return false;
-    return crypto.timingSafeEqual(bufA, bufB);
-  } catch (e) {
-    return false;
-  }
-}
-
 exports.webhook = async (req, res) => {
-  // Quando a rota é registrada com `express.raw`, `req.body` será um Buffer
-  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
-
-  // Cabeçalhos possíveis que provedores usam. O nome exato do header varia,
-  // então aceitamos alguns comuns e tentamos comparar contra ambos hex/base64.
-  const signatureHeader = req.headers['x-hook-signature'] || req.headers['x-hub-signature'] || req.headers['x-meli-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-signature'];
-
-  // Se não houver segredo configurado, negar por segurança
-  const webhookSecret = process.env.WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.warn('Webhook recebido, mas WEBHOOK_SECRET não está configurado. Rejeitando.');
-    return res.sendStatus(403);
-  }
-
-  let signatureVerified = false;
-  if (!signatureHeader) {
-    console.warn('Webhook sem header de assinatura. Irei confirmar via API do provedor (fallback).');
-    signatureVerified = false;
-  } else {
-    // Calcular HMAC-SHA256 sobre o corpo bruto
-    const hmacHex = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
-    const hmacBase64 = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('base64');
-
-    // Comparações seguras
-    const signature = String(signatureHeader).trim();
-    const valid = secureCompare(signature, hmacHex) || secureCompare(signature, hmacBase64) || secureCompare(hmacHex, signature) || secureCompare(hmacBase64, signature);
-    if (!valid) {
-      console.warn('Assinatura do webhook inválida. Rejeitando.');
-      return res.sendStatus(403);
-    }
-    signatureVerified = true;
-  }
-
-  // Agora podemos parsear o corpo JSON em `payload`
-  let payload;
-  try {
-    payload = JSON.parse(rawBody.toString('utf8'));
-  } catch (e) {
-    console.warn('Erro ao parsear corpo do webhook');
-    return res.sendStatus(400);
-  }
-
-  const { type, data } = payload;
+  const { type, data } = req.body;
   res.sendStatus(200);
   if (type !== "payment") return;
 
   try {
     const payment = new Payment(client);
-
-    // Se não havia assinatura, faremos uma verificação extra consultando a API
-    // do provedor para confirmar que o evento é legítimo.
-    if (!signatureVerified) {
-      // Tentamos parsear o payload e extrair o id
-      const incomingId = data && (data.id || data.payment_id || data.paymentId);
-      if (!incomingId) {
-        console.warn('Webhook sem assinatura e sem id de pagamento no payload. Ignorando.');
-        return;
-      }
-      // Consulta o provedor para confirmar o estado do pagamento
-      const pagamento = await payment.get({ id: incomingId });
-      if (!pagamento || pagamento.status !== "approved") {
-        console.warn('Fallback: pagamento não aprovado ou não encontrado via API. Ignorando.');
-        return;
-      }
-
-      // substituir data pelo objeto confirmado pelo provedor
-      data.id = pagamento.id;
-      // prosseguir com o processamento abaixo usando `pagamento`
-    }
-
     const pagamento = await payment.get({ id: data.id });
     if (pagamento.status !== "approved") return;
 
@@ -384,150 +245,5 @@ exports.getSaldo = async (req, res) => {
     res.json({ saldo: parseFloat(rows[0].saldo) });
   } catch (error) {
     res.status(500).json({ erro: "Erro ao buscar saldo" });
-  }
-};
-
-// ================= PAGAMENTO COM DÉBITO =================
-exports.pagarComDebito = async (req, res) => {
-  const { valor, token, paymentMethodId, issuerId, installments } = req.body;
-  const usuarioId = req.usuario.id;
-
-  try {
-    console.log("📋 Dados recebidos para débito:", {
-      valor,
-      token: token ? `${token.substring(0, 20)}...` : "não informado",
-      tokenLength: token ? token.length : 0,
-      paymentMethodId,
-      issuerId,
-      installments
-    });
-
-    // Validação básica
-    if (!valor || valor <= 0) {
-      return res.status(400).json({ erro: "Valor inválido" });
-    }
-
-    if (!token) {
-      return res.status(400).json({ erro: "Token do cartão não fornecido" });
-    }
-
-    // Processa pagamento via Mercado Pago com token
-    const payment = new Payment(client);
-    
-    const paymentPayload = {
-      body: {
-        transaction_amount: parseFloat(valor),
-        token: token, // Token gerado pelo SDK do MP no frontend
-        installments: installments || 1,
-        payment_method_id: paymentMethodId || "visa",
-        payer: {
-          email: req.usuario.email,
-        },
-        description: "Recarga BusTap - Débito",
-        metadata: {
-          usuario_id: usuarioId,
-          tipo: "recarga",
-          valor: parseFloat(valor),
-        },
-      },
-    };
-
-    // Só adiciona issuer_id se for um número inteiro válido
-    if (issuerId) {
-      const parsedIssuer = Number(issuerId);
-      if (!isNaN(parsedIssuer) && Number.isInteger(parsedIssuer) && parsedIssuer > 0) {
-        paymentPayload.body.issuer_id = parsedIssuer;
-      } else {
-        console.warn(`issuerId inválido ignorado: ${issuerId} (não é número inteiro positivo)`);
-      }
-    }
-
-    // Log seguro do payload (não imprimir token nem dados sensíveis)
-    try {
-      const pb = paymentPayload.body;
-      const safePb = {
-        transaction_amount: pb.transaction_amount,
-        installments: pb.installments,
-        payment_method_id: pb.payment_method_id,
-        metadata: pb.metadata,
-        payer: { email: pb.payer && pb.payer.email },
-        issuer_id: pb.issuer_id || null
-      };
-      console.log("📤 Enviando payload ao MP (mask):", JSON.stringify(safePb, null, 2));
-    } catch (e) {
-      console.log('📤 Enviando payload ao MP (mask): [erro ao montar log]');
-    }
-
-    const paymentResponse = await payment.create(paymentPayload);
-
-    // Log seguro da resposta (não imprimir dados sensíveis)
-    try {
-      const safeResp = {
-        id: paymentResponse.id || (paymentResponse.response && paymentResponse.response.id),
-        status: paymentResponse.status || (paymentResponse.response && paymentResponse.response.status),
-        status_detail: paymentResponse.status_detail || (paymentResponse.response && paymentResponse.response.status_detail)
-      };
-      console.log("📥 Resposta do MP (mask):", JSON.stringify(safeResp, null, 2));
-    } catch (e) {
-      console.log('📥 Resposta do MP (mask): [erro ao montar log]');
-    }
-
-    // Se aprovado, atualiza saldo
-    if (paymentResponse.status === "approved" || paymentResponse.status === "authorized") {
-      const conn = await db.getConnection();
-      try {
-        await conn.beginTransaction();
-
-        await conn.query(
-          "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?",
-          [valor, usuarioId]
-        );
-
-        await conn.query(
-          `INSERT INTO pagamentos_recarga 
-            (usuario_id, payment_id_mp, valor, status, criado_em)
-           VALUES (?, ?, ?, 'aprovado', NOW())`,
-          [usuarioId, String(paymentResponse.id), valor]
-        );
-
-        await conn.commit();
-        console.log(`✅ Pagamento com débito aprovado: usuário ${usuarioId} +R$${valor}`);
-
-        // Busca o novo saldo
-        const [saldoResult] = await db.query(
-          "SELECT saldo FROM usuarios WHERE id = ?",
-          [usuarioId]
-        );
-
-        res.json({
-          sucesso: true,
-          status: "approved",
-          mensagem: "Pagamento aprovado",
-          novoSaldo: parseFloat(saldoResult[0].saldo),
-          paymentId: paymentResponse.id,
-        });
-      } catch (err) {
-        await conn.rollback();
-        console.error("Erro na transação de débito:", err);
-        res.status(500).json({ erro: "Erro ao processar pagamento" });
-      } finally {
-        conn.release();
-      }
-    } else {
-      // Pagamento recusado ou pendente
-      console.warn(`⚠️ Pagamento ${paymentResponse.status}:`, paymentResponse.status_detail);
-      res.status(400).json({
-        sucesso: false,
-        status: paymentResponse.status,
-        statusDetail: paymentResponse.status_detail || "Pagamento não aprovado",
-        mensagem: paymentResponse.status_detail || "Pagamento não aprovado",
-      });
-    }
-  } catch (error) {
-    console.error("Erro ao processar pagamento com débito:", error);
-    res.status(500).json({ 
-      erro: "Erro ao processar pagamento",
-      detalhes: error.message 
-    });
   }
 };
