@@ -10,6 +10,7 @@ SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,N
 -- -----------------------------------------------------
 -- Schema tcc
 -- -----------------------------------------------------
+DROP SCHEMA IF EXISTS `tcc` ;
 
 -- -----------------------------------------------------
 -- Schema tcc
@@ -34,7 +35,7 @@ CREATE TABLE IF NOT EXISTS `tcc`.`usuarios` (
   UNIQUE INDEX `email` (`email` ASC) VISIBLE,
   UNIQUE INDEX `cpf` (`cpf` ASC) VISIBLE)
 ENGINE = InnoDB
-AUTO_INCREMENT = 2
+AUTO_INCREMENT = 3
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -48,8 +49,10 @@ CREATE TABLE IF NOT EXISTS `tcc`.`viagens` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `origem` VARCHAR(45) NOT NULL,
   `destino` VARCHAR(45) NOT NULL,
+  `distancia_km` DECIMAL(10,2) NOT NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB
+AUTO_INCREMENT = 2
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -62,12 +65,12 @@ DROP TABLE IF EXISTS `tcc`.`tickets` ;
 CREATE TABLE IF NOT EXISTS `tcc`.`tickets` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `codigo` VARCHAR(100) NOT NULL,
-  `duração` TIME NOT NULL,
   `valor` DECIMAL(10,3) NOT NULL,
   `ativação` TIMESTAMP NOT NULL,
   `status` ENUM('ativo', 'usado', 'cancelado', 'expirado') NOT NULL DEFAULT 'ativo',
   `viagens_id` INT NOT NULL,
   `usuarios_id` INT NOT NULL,
+  `distancia_km` DECIMAL(10,2) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE INDEX `codigo` (`codigo` ASC) VISIBLE,
   INDEX `fk_tickets_viagens1_idx` (`viagens_id` ASC) VISIBLE,
@@ -83,6 +86,7 @@ CREATE TABLE IF NOT EXISTS `tcc`.`tickets` (
     ON DELETE CASCADE
     ON UPDATE CASCADE)
 ENGINE = InnoDB
+AUTO_INCREMENT = 4
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -109,18 +113,19 @@ ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
+
 -- -----------------------------------------------------
 -- Table `tcc`.`pagamentos_recarga`
 -- -----------------------------------------------------
 DROP TABLE IF EXISTS `tcc`.`pagamentos_recarga` ;
 
 CREATE TABLE IF NOT EXISTS `tcc`.`pagamentos_recarga` (
-  `id`            INT           NOT NULL AUTO_INCREMENT,
-  `usuario_id`    INT           NOT NULL,
-  `payment_id_mp` VARCHAR(100)  NOT NULL,
-  `valor`         DECIMAL(10,2) NOT NULL,
-  `status`        ENUM('aprovado', 'pendente', 'recusado') NOT NULL DEFAULT 'pendente',
-  `criado_em`     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `usuario_id` INT NOT NULL,
+  `payment_id_mp` VARCHAR(100) NOT NULL,
+  `valor` DECIMAL(10,2) NOT NULL,
+  `status` ENUM('aprovado', 'pendente', 'recusado') NOT NULL DEFAULT 'pendente',
+  `criado_em` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE INDEX `payment_id_mp` (`payment_id_mp` ASC) VISIBLE,
   INDEX `fk_pagamentos_recarga_usuario_idx` (`usuario_id` ASC) VISIBLE,

@@ -5,7 +5,7 @@ const db = mysql.createPool({
     user: "root",
     password: "root",
     database: "tcc",
-    port: 3306, // ajuste se necessário
+    port: 3307, // ajuste se necessário
   });
   
   (async () => {
