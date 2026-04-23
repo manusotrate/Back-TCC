@@ -249,13 +249,91 @@ exports.consultarPagamento = async (req, res) => {
 };
 
 // ================= WEBHOOK =================
+const crypto = require('crypto');
+
+// Helper: safely compare buffers
+function secureCompare(a, b) {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch (e) {
+    return false;
+  }
+}
+
 exports.webhook = async (req, res) => {
-  const { type, data } = req.body;
+  // Quando a rota é registrada com `express.raw`, `req.body` será um Buffer
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+
+  // Cabeçalhos possíveis que provedores usam. O nome exato do header varia,
+  // então aceitamos alguns comuns e tentamos comparar contra ambos hex/base64.
+  const signatureHeader = req.headers['x-hook-signature'] || req.headers['x-hub-signature'] || req.headers['x-meli-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-signature'];
+
+  // Se não houver segredo configurado, negar por segurança
+  const webhookSecret = process.env.WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.warn('Webhook recebido, mas WEBHOOK_SECRET não está configurado. Rejeitando.');
+    return res.sendStatus(403);
+  }
+
+  let signatureVerified = false;
+  if (!signatureHeader) {
+    console.warn('Webhook sem header de assinatura. Irei confirmar via API do provedor (fallback).');
+    signatureVerified = false;
+  } else {
+    // Calcular HMAC-SHA256 sobre o corpo bruto
+    const hmacHex = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+    const hmacBase64 = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('base64');
+
+    // Comparações seguras
+    const signature = String(signatureHeader).trim();
+    const valid = secureCompare(signature, hmacHex) || secureCompare(signature, hmacBase64) || secureCompare(hmacHex, signature) || secureCompare(hmacBase64, signature);
+    if (!valid) {
+      console.warn('Assinatura do webhook inválida. Rejeitando.');
+      return res.sendStatus(403);
+    }
+    signatureVerified = true;
+  }
+
+  // Agora podemos parsear o corpo JSON em `payload`
+  let payload;
+  try {
+    payload = JSON.parse(rawBody.toString('utf8'));
+  } catch (e) {
+    console.warn('Erro ao parsear corpo do webhook');
+    return res.sendStatus(400);
+  }
+
+  const { type, data } = payload;
   res.sendStatus(200);
   if (type !== "payment") return;
 
   try {
     const payment = new Payment(client);
+
+    // Se não havia assinatura, faremos uma verificação extra consultando a API
+    // do provedor para confirmar que o evento é legítimo.
+    if (!signatureVerified) {
+      // Tentamos parsear o payload e extrair o id
+      const incomingId = data && (data.id || data.payment_id || data.paymentId);
+      if (!incomingId) {
+        console.warn('Webhook sem assinatura e sem id de pagamento no payload. Ignorando.');
+        return;
+      }
+      // Consulta o provedor para confirmar o estado do pagamento
+      const pagamento = await payment.get({ id: incomingId });
+      if (!pagamento || pagamento.status !== "approved") {
+        console.warn('Fallback: pagamento não aprovado ou não encontrado via API. Ignorando.');
+        return;
+      }
+
+      // substituir data pelo objeto confirmado pelo provedor
+      data.id = pagamento.id;
+      // prosseguir com o processamento abaixo usando `pagamento`
+    }
+
     const pagamento = await payment.get({ id: data.id });
     if (pagamento.status !== "approved") return;
 

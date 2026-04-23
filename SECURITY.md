@@ -37,4 +37,43 @@ bfg --replace-text passwords.txt
 - Revise logs para garantir que nenhum valor sensível (token, CPF, PAN, CVV) é impresso. Este repositório já teve sanitização aplicada nos logs de pagamento.
 - Defina `JWT_SECRET` forte e com expiração apropriada para tokens.
 
-Se quiser, eu executo os comandos Git para você (preciso de permissão para rodar no seu ambiente). Caso prefira executar, envie ok que eu forneço os comandos prontos e explico cada passo.
+6) Gerar e aplicar `WEBHOOK_SECRET` (exemplo local)
+
+- Para gerar um segredo forte localmente (Node.js):
+
+```bash
+# no diretório Back-TCC
+node scripts/generate-webhook-secret.js
+```
+
+- O script imprime o segredo e sugere como setar no PowerShell ou adicionar ao `.env` local. Exemplo PowerShell (não commite `.env`):
+
+```powershell
+$env:WEBHOOK_SECRET = "VALOR_GERADO"
+```
+
+- Para produção, configure `WEBHOOK_SECRET` nas variáveis do ambiente do seu provedor (Heroku/PM2/Docker secrets, etc.).
+
+7) Remoção segura de segredos já comitados
+
+- Se uma chave real vazou e foi enviada ao repositório remoto, seguir as instruções com BFG/git-filter-repo e rotacionar imediatamente as chaves no provedor.
+
+Se quiser, eu executo os comandos Git para você (preciso de permissão para rodar no seu ambiente). Caso prefira executar, envie `ok` que eu forneço os comandos prontos e explico cada passo.
+
+### Comandos prontos (exemplo)
+
+Se quiser que eu execute localmente, rode estes comandos no diretório `Back-TCC`:
+
+```powershell
+# 1) Garantir que .env não seja mais versionado
+git rm --cached .env
+git commit -m "chore: remove .env from repo"
+git push origin main
+
+# 2) Gerar novo segredo e exportar localmente (PowerShell)
+node scripts/generate-webhook-secret.js
+# use o valor impresso para setar no PowerShell:
+$env:WEBHOOK_SECRET = "VALOR_GERADO"
+
+# 3) Atualize sua configuração no provedor (Heroku/Vercel/Azure) com o mesmo valor
+```
