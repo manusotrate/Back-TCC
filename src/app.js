@@ -12,8 +12,25 @@ const app = express();
 
 app.use(helmet());
 
-// Configure CORS: use `APP_URL` in production, otherwise permissive for local dev
-const corsOptions = process.env.APP_URL ? { origin: process.env.APP_URL } : {};
+// Configure CORS: allow origins from APP_URL (can be comma-separated)
+// and also allow localhost for development (ionic serve default port).
+const allowedOrigins = [];
+if (process.env.APP_URL) {
+  allowedOrigins.push(...String(process.env.APP_URL).split(',').map(s => s.trim()).filter(Boolean));
+}
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push('http://localhost:8100');
+}
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // allow non-browser requests (no origin) and allowed origins
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  }
+};
+
 app.use(cors(corsOptions));
 
 const limiter = rateLimit({

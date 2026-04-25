@@ -10,20 +10,20 @@ SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,N
 -- -----------------------------------------------------
 -- Schema tcc
 -- -----------------------------------------------------
-DROP SCHEMA IF EXISTS `tcc` ;
+DROP SCHEMA IF EXISTS `tccbanco` ;
 
 -- -----------------------------------------------------
 -- Schema tcc
 -- -----------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS `tcc` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci ;
-USE `tcc` ;
+CREATE SCHEMA IF NOT EXISTS `tccbanco` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci ;
+USE `tccbanco` ;
 
 -- -----------------------------------------------------
 -- Table `tcc`.`usuarios`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `tcc`.`usuarios` ;
+DROP TABLE IF EXISTS `tccbanco`.`usuarios` ;
 
-CREATE TABLE IF NOT EXISTS `tcc`.`usuarios` (
+CREATE TABLE IF NOT EXISTS `tccbanco`.`usuarios` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `nome` VARCHAR(100) NOT NULL,
   `sobrenome` VARCHAR(100) NOT NULL,
@@ -41,11 +41,11 @@ COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- -----------------------------------------------------
--- Table `tcc`.`viagens`
+-- Table `tccbanco`.`viagens`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `tcc`.`viagens` ;
+DROP TABLE IF EXISTS `tccbanco`.`viagens` ;
 
-CREATE TABLE IF NOT EXISTS `tcc`.`viagens` (
+CREATE TABLE IF NOT EXISTS `tccbanco`.`viagens` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `origem` VARCHAR(45) NOT NULL,
   `destino` VARCHAR(45) NOT NULL,
@@ -58,11 +58,11 @@ COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- -----------------------------------------------------
--- Table `tcc`.`tickets`
+-- Table `tccbanco`.`tickets`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `tcc`.`tickets` ;
+DROP TABLE IF EXISTS `tccbanco`.`tickets` ;
 
-CREATE TABLE IF NOT EXISTS `tcc`.`tickets` (
+CREATE TABLE IF NOT EXISTS `tccbanco`.`tickets` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `codigo` VARCHAR(100) NOT NULL,
   `valor` DECIMAL(10,3) NOT NULL,
@@ -77,12 +77,12 @@ CREATE TABLE IF NOT EXISTS `tcc`.`tickets` (
   INDEX `fk_tickets_usuarios1_idx` (`usuarios_id` ASC) VISIBLE,
   CONSTRAINT `fk_tickets_usuarios1`
     FOREIGN KEY (`usuarios_id`)
-    REFERENCES `tcc`.`usuarios` (`id`)
+    REFERENCES `tccbanco`.`usuarios` (`id`)
     ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_tickets_viagens1`
     FOREIGN KEY (`viagens_id`)
-    REFERENCES `tcc`.`viagens` (`id`)
+    REFERENCES `tccbanco`.`viagens` (`id`)
     ON DELETE CASCADE
     ON UPDATE CASCADE)
 ENGINE = InnoDB
@@ -92,11 +92,11 @@ COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- -----------------------------------------------------
--- Table `tcc`.`pagamentos`
+-- Table `tccbanco`.`pagamentos`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `tcc`.`pagamentos` ;
+DROP TABLE IF EXISTS `tccbanco`.`pagamentos` ;
 
-CREATE TABLE IF NOT EXISTS `tcc`.`pagamentos` (
+CREATE TABLE IF NOT EXISTS `tccbanco`.`pagamentos` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `valor` DECIMAL(10,3) NOT NULL,
   `formas_pagamento` ENUM('Crédito', 'Debito', 'Pix') NOT NULL,
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS `tcc`.`pagamentos` (
   INDEX `fk_pagamentos_tickets_idx` (`tickets_id` ASC) VISIBLE,
   CONSTRAINT `fk_pagamentos_tickets`
     FOREIGN KEY (`tickets_id`)
-    REFERENCES `tcc`.`tickets` (`id`)
+    REFERENCES `tccbanco`.`tickets` (`id`)
     ON DELETE CASCADE
     ON UPDATE CASCADE)
 ENGINE = InnoDB
@@ -115,11 +115,11 @@ COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- -----------------------------------------------------
--- Table `tcc`.`pagamentos_recarga`
+-- Table `tccbanco`.`pagamentos_recarga`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `tcc`.`pagamentos_recarga` ;
+DROP TABLE IF EXISTS `tccbanco`.`pagamentos_recarga` ;
 
-CREATE TABLE IF NOT EXISTS `tcc`.`pagamentos_recarga` (
+CREATE TABLE IF NOT EXISTS `tccbanco`.`pagamentos_recarga` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `usuario_id` INT NOT NULL,
   `payment_id_mp` VARCHAR(100) NOT NULL,
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS `tcc`.`pagamentos_recarga` (
   INDEX `fk_pagamentos_recarga_usuario_idx` (`usuario_id` ASC) VISIBLE,
   CONSTRAINT `fk_pagamentos_recarga_usuario`
     FOREIGN KEY (`usuario_id`)
-    REFERENCES `tcc`.`usuarios` (`id`)
+    REFERENCES `tccbanco`.`usuarios` (`id`)
     ON DELETE CASCADE
     ON UPDATE CASCADE)
 ENGINE = InnoDB
