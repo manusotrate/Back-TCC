@@ -17,6 +17,7 @@ exports.cadastro = async (req, res) => {
   }
 
   try {
+
     const cpfLimpo = cpf.replace(/\D/g, "");
     const hashedSenha = await bcrypt.hash(senha, 10);
 
@@ -49,6 +50,7 @@ exports.cadastro = async (req, res) => {
 
 // ================= LOGIN =================
 exports.login = async (req, res) => {
+
   const { cpf, senha } = req.body;
 
   if (!cpf || !senha) {
@@ -166,6 +168,12 @@ exports.recuperarSenha = async (req, res) => {
 
   const { email } = req.body;
 
+  console.log("🔍 Recuperar senha chamado");
+  console.log("🔍 Email recebido:", email);
+  console.log("🔍 EMAIL_USER:", process.env.EMAIL_USER);
+  console.log("🔍 EMAIL_PASS definido:", !!process.env.EMAIL_PASS);
+  console.log("🔍 APP_URL:", process.env.APP_URL);
+
   if (!email) {
     return res.status(400).json({
       erro: "Email obrigatório"
@@ -174,10 +182,12 @@ exports.recuperarSenha = async (req, res) => {
 
   try {
 
+    console.log("🔍 Buscando usuário no banco...");
     const [rows] = await db.query(
       "SELECT id, nome FROM usuarios WHERE email = ?",
       [email]
     );
+    console.log("🔍 Usuários encontrados:", rows.length);
 
     if (rows.length === 0) {
       return res.json({
@@ -204,6 +214,7 @@ exports.recuperarSenha = async (req, res) => {
       expira_em = VALUES(expira_em)`,
       [usuario.id, token, expira]
     );
+    console.log("✅ Token salvo no banco:", token);
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -214,31 +225,41 @@ exports.recuperarSenha = async (req, res) => {
     });
 
     const link = `${process.env.APP_URL}/redefinir-senha?token=${token}`;
+    console.log("📧 Link gerado:", link);
 
-   try {
-  const info = await transporter.sendMail({
-    from: `"BusTap" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: "Recuperação de senha - BusTap",
-    html: `
-      <h2>Olá, ${usuario.nome}!</h2>
-      <p>Clique no link abaixo para redefinir sua senha:</p>
-      <a href="${link}">Redefinir senha</a>
-      <p>Este link expira em 1 hora.</p>
-      <p>Se não foi você, ignore este email.</p>
-    `
-  });
+    try {
 
-  console.log("✅ Email enviado:", info.messageId);
+      console.log("📧 Tentando enviar email para:", email);
 
-} catch (emailError) {
+      const info = await transporter.sendMail({
+        from: `"BusTap" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: "Recuperação de senha - BusTap",
+        html: `
+          <h2>Olá, ${usuario.nome}!</h2>
+          <br>
+          <p>Seu token de recuperação de senha é:</p>
+          <br>
+          <p style="font-size:18px;font-weight:bold;letter-spacing:2px;">${token}</p>
+          <br>
+          <p>Cole esse token no aplicativo para redefinir sua senha.</p>
+          <p>Este token expira em 1 hora.</p>
+          <br>
+          <p>Se não foi você, ignore este email.</p>
+         <strong> <p1> Com prazer Bustap   </p1> </strong>
+        `
+      });
 
-  console.error("❌ Código do erro:", emailError.code);
-  console.error("❌ Mensagem:", emailError.message);
-  console.error("❌ Resposta SMTP:", emailError.response);
+      console.log("✅ Email enviado:", info.messageId);
 
-  throw emailError;
-}
+    } catch (emailError) {
+
+      console.error("❌ Código do erro:", emailError.code);
+      console.error("❌ Mensagem:", emailError.message);
+      console.error("❌ Resposta SMTP:", emailError.response);
+
+      throw emailError;
+    }
 
     res.json({
       mensagem: "Se o email existir, você receberá as instruções."
