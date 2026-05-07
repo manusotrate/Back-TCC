@@ -215,30 +215,30 @@ exports.recuperarSenha = async (req, res) => {
 
     const link = `${process.env.APP_URL}/redefinir-senha?token=${token}`;
 
-    await transporter.sendMail({
-      from: `"BusTap" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Recuperação de senha - BusTap",
-      html: `
-        <h2>Olá, ${usuario.nome}!</h2>
+   try {
+  const info = await transporter.sendMail({
+    from: `"BusTap" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Recuperação de senha - BusTap",
+    html: `
+      <h2>Olá, ${usuario.nome}!</h2>
+      <p>Clique no link abaixo para redefinir sua senha:</p>
+      <a href="${link}">Redefinir senha</a>
+      <p>Este link expira em 1 hora.</p>
+      <p>Se não foi você, ignore este email.</p>
+    `
+  });
 
-        <p>
-          Clique no link abaixo para redefinir sua senha:
-        </p>
+  console.log("✅ Email enviado:", info.messageId);
 
-        <a href="${link}">
-          Redefinir senha
-        </a>
+} catch (emailError) {
 
-        <p>
-          Este link expira em 1 hora.
-        </p>
+  console.error("❌ Código do erro:", emailError.code);
+  console.error("❌ Mensagem:", emailError.message);
+  console.error("❌ Resposta SMTP:", emailError.response);
 
-        <p>
-          Se não foi você, ignore este email.
-        </p>
-      `
-    });
+  throw emailError;
+}
 
     res.json({
       mensagem: "Se o email existir, você receberá as instruções."
